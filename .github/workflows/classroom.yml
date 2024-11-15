@@ -1,0 +1,63 @@
+name: Autograding Tests
+on:  
+  repository_dispatch:
+  workflow_dispatch:
+  pull_request:
+    branches: feedback  
+permissions:
+  checks: write
+  actions: read
+  contents: read
+
+
+jobs:
+  get-workflow-id:
+    outputs:
+      run_id: ${{steps.get_workflow.outputs.run_id}}
+    runs-on: ubuntu-latest
+
+    steps:          
+      - name: Get workFlow Run
+        id: get_workflow
+        uses: madBabel/get-run-id-of-wf-action@v2
+        with:
+            workflow-file: 'workflow.yml'    
+            status: 'success'
+
+  checkJob:   
+    needs: get-workflow-id
+    runs-on: ubuntu-latest    
+    outputs: 
+      stepsExecuted: ${{steps.check_Steps_for_JOB.outputs.stepsExecuted}}
+    steps:     
+ 
+      - name: Check step executed for JOB
+        id: check_Steps_for_JOB
+        uses: madBabel/check-jobs-steps-gha-action@v2
+        with:
+          run-id: ${{needs.get-workflow-id.outputs.run_id}}
+          job-to-execute: Saludo
+          steps-to-execute: echo-hello-world
+            
+
+  autograding-reporter:    
+      needs: [checkJob]
+      runs-on: ubuntu-latest    
+      steps:           
+      - name: Run Autograding Step Tests for HEL
+        uses: classroom-resources/autograding-io-grader@v1      
+        id: test1
+        with:
+            test-name: 'Test Step executed'   
+            command: 'echo ${{needs.checkJob.outputs.stepsExecuted}}'
+            input: ''
+            expected-output: 'true'
+            comparison-method: 'exact'  
+            max-score: 100
+            
+      - name: Autograding Reporter
+        uses: classroom-resources/autograding-grading-reporter@v1     
+        with:
+           runners: test1
+        env:
+          TEST1_RESULTS: "${{ steps.test1.outputs.result }}"      
